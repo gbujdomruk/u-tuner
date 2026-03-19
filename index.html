@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0f0f0f">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>U-Tuner</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0c0c0c;
+      --surface: #161616;
+      --surface2: #1f1f1f;
+      --border: rgba(255,255,255,0.08);
+      --text: #f0ede8;
+      --muted: rgba(240,237,232,0.45);
+      --hint: rgba(240,237,232,0.2);
+      --green: #7ecb8f;
+      --green-dim: rgba(126,203,143,0.15);
+      --amber: #e8b86d;
+      --amber-dim: rgba(232,184,109,0.15);
+      --red: #e07070;
+      --red-dim: rgba(224,112,112,0.15);
+      --blue: #6eb5e8;
+      --accent: #c8b89a;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'DM Mono', monospace; overflow: hidden; }
+
+    #app {
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 2rem 1.25rem 1.5rem;
+      max-width: 420px;
+      margin: 0 auto;
+    }
+
+    /* HEADER */
+    header {
+      text-align: center;
+      width: 100%;
+    }
+    .app-title {
+      font-family: 'Instrument Serif', serif;
+      font-style: italic;
+      font-size: 28px;
+      font-weight: 400;
+      color: var(--accent);
+      letter-spacing: 0.01em;
+    }
+    .app-sub {
+      font-size: 11px;
+      font-weight: 300;
+      color: var(--muted);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+
+    /* CORDE SELECTOR */
+    .strings-section { width: 100%; }
+    .strings-label {
+      font-size: 10px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--hint);
+      text-align: center;
+      margin-bottom: 12px;
+    }
+    .strings-row {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
+    .str-btn {
+      flex: 1;
+      max-width: 88px;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      transition: all 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+    .str-btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: radial-gradient(circle at 40% 35%, rgba(255,255,255,0.04), transparent 60%);
+    }
+    .str-btn .note-fr { font-family: 'Instrument Serif', serif; font-style: italic; font-size: 18px; color: var(--muted); transition: color 0.2s; }
+    .str-btn .note-hz { font-size: 9px; font-weight: 300; color: var(--hint); letter-spacing: 0.05em; transition: color 0.2s; }
+    .str-btn.active { border-color: var(--accent); background: rgba(200,184,154,0.08); }
+    .str-btn.active .note-fr { color: var(--accent); }
+    .str-btn.active .note-hz { color: rgba(200,184,154,0.6); }
+    .str-btn:active { transform: scale(0.95); }
+
+    /* METER */
+    .meter-wrap {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+    .note-readout {
+      text-align: center;
+    }
+    .detected-note {
+      font-family: 'Instrument Serif', serif;
+      font-style: italic;
+      font-size: 72px;
+      line-height: 1;
+      color: var(--text);
+      transition: color 0.3s;
+      min-height: 72px;
+    }
+    .detected-freq {
+      font-size: 12px;
+      font-weight: 300;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      margin-top: 4px;
+      min-height: 18px;
+    }
+
+    #gauge-canvas {
+      display: block;
+      width: 100%;
+      max-width: 340px;
+      height: 140px;
+    }
+
+    .cents-display {
+      font-size: 13px;
+      font-weight: 400;
+      letter-spacing: 0.05em;
+      min-height: 22px;
+      transition: color 0.3s;
+      color: var(--muted);
+    }
+
+    /* MIC BUTTON */
+    .mic-btn {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      position: relative;
+    }
+    .mic-btn svg { width: 28px; height: 28px; stroke: var(--muted); fill: none; transition: stroke 0.2s; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+    .mic-btn:hover { border-color: rgba(255,255,255,0.18); }
+    .mic-btn.on { border-color: var(--red); background: var(--red-dim); }
+    .mic-btn.on svg { stroke: var(--red); }
+    .mic-btn:active { transform: scale(0.93); }
+    .pulse-ring {
+      position: absolute;
+      inset: -6px;
+      border-radius: 50%;
+      border: 1px solid var(--red);
+      opacity: 0;
+      animation: none;
+    }
+    .mic-btn.on .pulse-ring { animation: pulse 1.8s ease-out infinite; }
+    @keyframes pulse {
+      0% { opacity: 0.5; transform: scale(1); }
+      100% { opacity: 0; transform: scale(1.5); }
+    }
+    .mic-status { font-size: 10px; font-weight: 300; letter-spacing: 0.12em; text-transform: uppercase; color: var(--hint); margin-top: 8px; min-height: 16px; }
+    .bottom-row { display: flex; align-items: flex-end; justify-content: center; gap: 28px; }
+    .ref-btn { width: 52px; height: 52px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface2); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+    .ref-btn svg { width: 22px; height: 22px; stroke: var(--muted); fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; transition: stroke 0.2s; }
+    .ref-btn:hover { border-color: rgba(255,255,255,0.18); }
+    .ref-btn.on { border-color: var(--accent); background: rgba(200,184,154,0.1); }
+    .ref-btn.on svg { stroke: var(--accent); }
+    .ref-btn:active { transform: scale(0.93); }
+    .ref-label { font-size: 10px; font-weight: 300; letter-spacing: 0.12em; text-transform: uppercase; color: var(--hint); margin-top: 8px; min-height: 16px; text-align: center; }
+    .inst-row { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 8px; margin-bottom: 2px; }
+    .fav-star { background: none; border: none; cursor: pointer; font-size: 16px; color: var(--hint); padding: 2px 4px; transition: color 0.2s; line-height: 1; }
+    .fav-star.active { color: var(--accent); }
+    .favs-row { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-top: 6px; min-height: 28px; }
+    .fav-chip { background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 300; color: var(--muted); cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+    .fav-chip:hover { border-color: rgba(255,255,255,0.2); color: var(--text); }
+    .fav-chip.current { border-color: var(--accent); color: var(--accent); }
+    .inst-row { display: flex; justify-content: center; margin-top: 8px; margin-bottom: 2px; }
+    .inst-select { background: var(--surface2); color: var(--text); border: 1px solid var(--border); border-radius: var(--border-radius-md, 8px); padding: 6px 28px 6px 12px; font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 300; cursor: pointer; appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='rgba(240,237,232,0.4)' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; }
+    .inst-select:focus { outline: none; border-color: var(--accent); }
+    .a4-row { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 6px; }
+    .a4-btn { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface2); color: var(--muted); font-size: 18px; font-family: 'DM Mono', monospace; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; transition: all 0.15s; }
+    .a4-btn:hover { border-color: rgba(255,255,255,0.2); color: var(--text); }
+    .a4-btn:active { transform: scale(0.9); }
+    .a4-display { text-align: center; min-width: 80px; }
+    .a4-label { font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--hint); display: block; }
+    .a4-val { font-size: 15px; font-weight: 400; color: var(--accent); }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <header>
+    <div class="app-title">U-Tuner</div>
+    <div class="inst-row">
+      <select class="inst-select" id="inst-select" onchange="changeInstrument(this.value)">
+        <option value="violon">Violon</option>
+        <option value="alto">Alto</option>
+        <option value="violoncelle">Violoncelle</option>
+        <option value="contrebasse">Contrebasse</option>
+        <option value="guitare">Guitare</option>
+        <option value="basse">Guitare basse</option>
+        <option value="mandoline">Mandoline</option>
+        <option value="ukulele">Ukulélé</option>
+        <option value="banjo">Banjo (5 cordes)</option>
+        <option value="guitare7">Guitare 7 cordes</option>
+        <option value="basse5">Guitare basse 5</option>
+        <option value="basse6">Guitare basse 6</option>
+        <option value="ukulele_basse">Ukulélé basse</option>
+      </select>
+      <button class="fav-star" id="fav-star" title="Ajouter aux favoris" onclick="toggleFav()">☆</button>
+    </div>
+    <div class="favs-row" id="favs-row"></div>
+    <div class="a4-row">
+      <button class="a4-btn" onclick="changeA4(-1)">−</button>
+      <div class="a4-display">
+        <span class="a4-label">A4</span>
+        <span class="a4-val" id="a4-val">440 Hz</span>
+      </div>
+      <button class="a4-btn" onclick="changeA4(+1)">+</button>
+    </div>
+  </header>
+
+  <div class="strings-section">
+    <div class="strings-label">Corde cible</div>
+    <div class="strings-row" id="strings-row">
+    </div>
+  </div>
+
+  <div class="meter-wrap">
+    <div class="note-readout">
+      <div class="detected-note" id="det-note">—</div>
+      <div class="detected-freq" id="det-freq"></div>
+    </div>
+    <canvas id="gauge-canvas" height="120"></canvas>
+    <div class="cents-display" id="cents-disp"></div>
+  </div>
+
+  <div class="bottom-row">
+    <div style="display:flex;flex-direction:column;align-items:center;">
+      <button class="ref-btn" id="ref-btn" onclick="toggleRef()">
+        <svg viewBox="0 0 24 24">
+          <path d="M9 18V5l12-2v13"/>
+          <circle cx="6" cy="18" r="3"/>
+          <circle cx="18" cy="16" r="3"/>
+        </svg>
+      </button>
+      <div class="ref-label" id="ref-label">référence</div>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;">
+      <button class="mic-btn" id="mic-btn" onclick="toggleMic()">
+        <div class="pulse-ring"></div>
+        <svg viewBox="0 0 24 24">
+          <rect x="9" y="2" width="6" height="11" rx="3"/>
+          <path d="M5 10a7 7 0 0 0 14 0"/>
+          <line x1="12" y1="17" x2="12" y2="21"/>
+          <line x1="9" y1="21" x2="15" y2="21"/>
+        </svg>
+      </button>
+      <div class="mic-status" id="mic-status">appuyer pour écouter</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ─── Catalogue d'instruments ─────────────────────────────
+// Chaque corde : { fr: nom français, semis: demi-tons depuis A4 }
+const INSTRUMENTS = {
+  violon:      { label: 'Violon',          freqMin: 150, freqMax: 900,
+    strings: [ {id:'G', fr:'Sol3', semis:-14}, {id:'D', fr:'Ré4',  semis:-7},
+               {id:'A', fr:'La4',  semis:  0}, {id:'E', fr:'Mi5',  semis: 7} ] },
+  alto:        { label: 'Alto',            freqMin: 100, freqMax: 700,
+    strings: [ {id:'C', fr:'Do3',  semis:-21}, {id:'G', fr:'Sol3', semis:-14},
+               {id:'D', fr:'Ré4',  semis: -7}, {id:'A', fr:'La4',  semis:  0} ] },
+  violoncelle: { label: 'Violoncelle',     freqMin: 55,  freqMax: 450,
+    strings: [ {id:'C', fr:'Do2',  semis:-33}, {id:'G', fr:'Sol2', semis:-26},
+               {id:'D', fr:'Ré3',  semis:-19}, {id:'A', fr:'La3',  semis:-12} ] },
+  contrebasse: { label: 'Contrebasse',     freqMin: 30,  freqMax: 220,
+    strings: [ {id:'E', fr:'Mi1',  semis:-43}, {id:'A', fr:'La1',  semis:-36},
+               {id:'D', fr:'Ré2',  semis:-29}, {id:'G', fr:'Sol2', semis:-22} ] },
+  guitare:     { label: 'Guitare',         freqMin: 70,  freqMax: 700,
+    strings: [ {id:'E2', fr:'Mi2', semis:-29}, {id:'A', fr:'La2',  semis:-24},
+               {id:'D', fr:'Ré3',  semis:-17}, {id:'G', fr:'Sol3', semis:-10},
+               {id:'B', fr:'Si3',  semis: -6}, {id:'E4', fr:'Mi4', semis: -5} ] },
+  basse:       { label: 'Guitare basse',   freqMin: 30,  freqMax: 220,
+    strings: [ {id:'E', fr:'Mi1',  semis:-43}, {id:'A', fr:'La1',  semis:-36},
+               {id:'D', fr:'Ré2',  semis:-29}, {id:'G', fr:'Sol2', semis:-22} ] },
+  mandoline:   { label: 'Mandoline',       freqMin: 150, freqMax: 900,
+    strings: [ {id:'G', fr:'Sol3', semis:-14}, {id:'D', fr:'Ré4',  semis: -7},
+               {id:'A', fr:'La4',  semis:  0}, {id:'E', fr:'Mi5',  semis:  7} ] },
+  ukulele:     { label: 'Ukulélé',         freqMin: 200, freqMax: 700,
+    strings: [ {id:'G', fr:'Sol4', semis: -2}, {id:'C', fr:'Do4',  semis: -9},
+               {id:'E', fr:'Mi4',  semis: -1}, {id:'A', fr:'La4',  semis:  0} ] },
+  banjo:       { label: 'Banjo (5 cordes)', freqMin: 130, freqMax: 700,
+    strings: [ {id:'G5', fr:'Sol4',semis: -5}, {id:'D', fr:'Ré3',  semis:-19},
+               {id:'G', fr:'Sol3', semis:-14}, {id:'B', fr:'Si3',  semis:-10},
+               {id:'D4', fr:'Ré4', semis: -7} ] },
+  guitare7:    { label: 'Guitare 7 cordes',  freqMin: 40,  freqMax: 700,
+    strings: [ {id:'B1', fr:'Si1',  semis:-38}, {id:'E2', fr:'Mi2', semis:-29},
+               {id:'A',  fr:'La2',  semis:-24}, {id:'D',  fr:'Ré3', semis:-17},
+               {id:'G',  fr:'Sol3', semis:-10}, {id:'B3', fr:'Si3', semis: -6},
+               {id:'E4', fr:'Mi4',  semis: -5} ] },
+  basse5:      { label: 'Guitare basse 5',   freqMin: 20,  freqMax: 220,
+    strings: [ {id:'B0', fr:'Si0',  semis:-50}, {id:'E',  fr:'Mi1', semis:-43},
+               {id:'A',  fr:'La1',  semis:-36}, {id:'D',  fr:'Ré2', semis:-29},
+               {id:'G',  fr:'Sol2', semis:-22} ] },
+  basse6:      { label: 'Guitare basse 6',   freqMin: 20,  freqMax: 250,
+    strings: [ {id:'B0', fr:'Si0',  semis:-50}, {id:'E',  fr:'Mi1', semis:-43},
+               {id:'A',  fr:'La1',  semis:-36}, {id:'D',  fr:'Ré2', semis:-29},
+               {id:'G',  fr:'Sol2', semis:-22}, {id:'C3', fr:'Do3', semis:-21} ] },
+  ukulele_basse: { label: 'Ukulélé basse',   freqMin: 30,  freqMax: 220,
+    strings: [ {id:'E',  fr:'Mi1',  semis:-43}, {id:'A',  fr:'La1', semis:-36},
+               {id:'D',  fr:'Ré2',  semis:-29}, {id:'G',  fr:'Sol2',semis:-22} ] },
+};
+const NOTE_FR = ['Do','Do♯','Ré','Ré♯','Mi','Fa','Fa♯','Sol','Sol♯','La','La♯','Si'];
+
+let a4 = 440;
+let currentInstrument = 'violon';
+let STRINGS = {};  // corde_id → { fr, freq } pour l'instrument actif
+
+function rebuildStrings() {
+  const inst = INSTRUMENTS[currentInstrument];
+  STRINGS = {};
+  inst.strings.forEach(s => {
+    STRINGS[s.id] = { fr: s.fr, freq: a4 * Math.pow(2, s.semis / 12) };
+  });
+  document.getElementById('a4-val').textContent = a4 + ' Hz';
+  // Mettre à jour les boutons de cordes
+  renderStringButtons();
+  // Mettre à jour l'oscillateur si actif
+  if (refPlaying && refOsc && STRINGS[target]) {
+    refOsc.frequency.setTargetAtTime(STRINGS[target].freq, refCtx.currentTime, 0.05);
+    document.getElementById('ref-label').textContent = STRINGS[target].fr + ' · ' + STRINGS[target].freq.toFixed(1) + ' Hz';
+  }
+}
+
+function changeA4(delta) {
+  a4 = Math.max(415, Math.min(470, a4 + delta));
+  rebuildStrings();
+  smoothCents = 0;
+}
+
+// ─── Favoris + persistance localStorage ─────────────────
+let favorites = [];
+
+function loadPrefs() {
+  try {
+    const saved = localStorage.getItem('accordeur_prefs');
+    if (saved) {
+      const prefs = JSON.parse(saved);
+      favorites = prefs.favorites || [];
+      return prefs.instrument || 'violon';
+    }
+  } catch(e) {}
+  return 'violon';
+}
+
+function savePrefs() {
+  try {
+    localStorage.setItem('accordeur_prefs', JSON.stringify({
+      instrument: currentInstrument,
+      favorites: favorites
+    }));
+  } catch(e) {}
+}
+
+function toggleFav() {
+  const idx = favorites.indexOf(currentInstrument);
+  if (idx >= 0) {
+    favorites.splice(idx, 1);
+  } else {
+    favorites.push(currentInstrument);
+  }
+  savePrefs();
+  renderFavs();
+  updateStarBtn();
+}
+
+function updateStarBtn() {
+  const star = document.getElementById('fav-star');
+  if (!star) return;
+  const isFav = favorites.includes(currentInstrument);
+  star.textContent = isFav ? '★' : '☆';
+  star.classList.toggle('active', isFav);
+}
+
+function renderFavs() {
+  const row = document.getElementById('favs-row');
+  if (!row) return;
+  row.innerHTML = '';
+  favorites.forEach(key => {
+    const inst = INSTRUMENTS[key];
+    if (!inst) return;
+    const chip = document.createElement('button');
+    chip.className = 'fav-chip' + (key === currentInstrument ? ' current' : '');
+    chip.textContent = inst.label;
+    chip.onclick = () => {
+      document.getElementById('inst-select').value = key;
+      changeInstrument(key);
+    };
+    row.appendChild(chip);
+  });
+}
+
+function changeInstrument(instKey) {
+  currentInstrument = instKey;
+  const inst = INSTRUMENTS[instKey];
+  // Sélectionner la première corde par défaut
+  rebuildStrings();
+  target = inst.strings[0].id;
+  smoothCents = 0;
+  // Adapter la plage de détection YIN
+  document.getElementById('app').dataset.freqMin = inst.freqMin;
+  document.getElementById('app').dataset.freqMax = inst.freqMax;
+  renderStringButtons();
+  // Sélectionner visuellement la 1ère corde
+  document.querySelectorAll('.str-btn').forEach(b => b.classList.remove('active'));
+  const first = document.querySelector('.str-btn');
+  if (first) first.classList.add('active');
+  // Arrêter le son de référence si actif
+  if (refPlaying) stopRef();
+  // Persister + mettre à jour UI favoris
+  savePrefs();
+  renderFavs();
+  updateStarBtn();
+}
+
+function renderStringButtons() {
+  const inst = INSTRUMENTS[currentInstrument];
+  const row = document.getElementById('strings-row');
+  row.innerHTML = '';
+  inst.strings.forEach(s => {
+    const freq = STRINGS[s.id].freq;
+    const btn = document.createElement('button');
+    btn.className = 'str-btn' + (s.id === target ? ' active' : '');
+    btn.id = 'btn-' + s.id;
+    btn.onclick = () => setTarget(s.id);
+    btn.innerHTML = '<span class="note-fr">' + s.fr + '</span><span class="note-hz" id="hz-' + s.id + '">' + freq.toFixed(1) + ' Hz</span>';
+    row.appendChild(btn);
+  });
+}
+
+let target = 'A';
+let running = false;
+let audioCtx, analyser, stream, rafId;
+let smoothCents = 0;
+let lastVolume = 0;
+let refPlaying = false;  // déclaré ici pour être accessible dans setTarget
+
+function setTarget(note, auto) {
+  if (auto && target === note) return;
+  target = note;
+  smoothCents = 0;
+  document.querySelectorAll('.str-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('btn-' + note).classList.add('active');
+  // Mettre à jour l'oscillateur de référence si actif
+  if (refPlaying && refOsc) {
+    refOsc.frequency.setTargetAtTime(STRINGS[target].freq, refCtx.currentTime, 0.05);
+    document.getElementById('ref-label').textContent = STRINGS[target].fr + ' · ' + STRINGS[target].freq.toFixed(1) + ' Hz';
+  }
+}
+
+/* Sélectionne automatiquement la corde la plus proche.
+   Seuil de 40 cents : à mi-chemin entre deux cordes adjacentes
+   (intervalle de quinte = 700 cents, donc 350 cents de demi-chemin,
+   mais on veut basculer tôt → 40 cents suffit pour éviter les
+   faux positifs sur les harmoniques). */
+function autoSelectString(freq) {
+  let bestNote = null, bestDist = Infinity;
+  for (const [note, data] of Object.entries(STRINGS)) {
+    const dist = Math.abs(1200 * Math.log2(freq / data.freq));
+    if (dist < bestDist) { bestDist = dist; bestNote = note; }
+  }
+  if (bestNote && bestNote !== target) {
+    const distCurrent = Math.abs(1200 * Math.log2(freq / STRINGS[target].freq));
+    if (distCurrent > 40) setTarget(bestNote, true);
+  }
+}
+
+/* ─── YIN pitch detection avec interpolation parabolique ──
+   Sans interpolation, la fréquence retournée vaut sr/t où t
+   est un entier → résolution ~17 cents autour du La 440 Hz.
+   L'interpolation parabolique affine t en sous-entier et
+   ramène la précision à bien moins d'un cent.               */
+function yinPitch(buf, sr) {
+  const N = buf.length, half = N >> 1;
+  const d = new Float32Array(half);
+  let rs = 0; d[0] = 1;
+  for (let t = 1; t < half; t++) {
+    let s = 0;
+    for (let i = 0; i < half; i++) { const x = buf[i] - buf[i+t]; s += x*x; }
+    d[t] = s;
+    rs += s;
+    d[t] = rs > 0 ? d[t] * t / rs : 1;
+  }
+  for (let t = 2; t < half - 1; t++) {
+    if (d[t] < 0.12 && d[t] < d[t+1]) {
+      // Interpolation parabolique : affine t vers un réel
+      const denom = d[t-1] - 2*d[t] + d[t+1];
+      const tRefined = denom !== 0
+        ? t - 0.5 * (d[t+1] - d[t-1]) / denom
+        : t;
+      return sr / tRefined;
+    }
+  }
+  return -1;
+}
+
+/* ─── Note from freq ──────────────────────────────────── */
+function freqToNote(freq) {
+  const semi = 12 * Math.log2(freq / a4);
+  const r = Math.round(semi);
+  const cents = Math.round((semi - r) * 100);
+  const idx = ((r % 12) + 12 + 9) % 12;
+  return { name: NOTE_FR[idx], cents };
+}
+function centsFromTarget(freq) {
+  return 1200 * Math.log2(freq / STRINGS[target].freq);
+}
+
+/* ─── Canvas gauge ────────────────────────────────────── */
+const canvas = document.getElementById('gauge-canvas');
+const gctx = canvas.getContext('2d');
+
+function drawGauge(cents, active) {
+  const W = canvas.offsetWidth * devicePixelRatio;
+  const H = 140 * devicePixelRatio;
+  canvas.width = W; canvas.height = H;
+  gctx.clearRect(0, 0, W, H);
+
+  // Pivot au centre bas du canvas, arc symétrique autour de -90° (midi = haut)
+  const cx = W / 2;
+  const cy = H * 0.88;                        // pivot bien en bas
+  const R  = Math.min(W * 0.44, cy * 0.96);  // rayon tel que le sommet reste dans le canvas
+  const clamp = Math.max(-60, Math.min(60, cents));
+
+  // L'angle 0 (accordé) pointe vers le haut : -Math.PI/2
+  // Plage : ±60 cents → ±(0.75 * π/2) rad autour de -π/2
+  const SPREAD = Math.PI * 0.72;  // amplitude totale de l'arc (±36° soit 144° au total)
+  function centsToAngle(c) { return -Math.PI / 2 + (c / 60) * SPREAD; }
+
+  // Segments colorés
+  const segs = [
+    { from: -60, to: -20, color: 'rgba(224,112,112,0.18)' },
+    { from: -20, to: -6,  color: 'rgba(232,184,109,0.2)'  },
+    { from:  -6, to:  6,  color: 'rgba(126,203,143,0.22)' },
+    { from:   6, to:  20, color: 'rgba(232,184,109,0.2)'  },
+    { from:  20, to:  60, color: 'rgba(224,112,112,0.18)' },
+  ];
+  segs.forEach(s => {
+    const a1 = centsToAngle(s.from), a2 = centsToAngle(s.to);
+    gctx.beginPath();
+    gctx.moveTo(cx, cy);
+    gctx.arc(cx, cy, R * 0.93, a1, a2);
+    gctx.closePath();
+    gctx.fillStyle = s.color;
+    gctx.fill();
+  });
+
+  // Arc extérieur
+  gctx.beginPath();
+  gctx.arc(cx, cy, R * 0.93, centsToAngle(-60), centsToAngle(60));
+  gctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  gctx.lineWidth = 1 * devicePixelRatio;
+  gctx.stroke();
+
+  // Graduations
+  [-40, -20, -10, 0, 10, 20, 40].forEach(v => {
+    const a = centsToAngle(v);
+    const inner = v === 0 ? R * 0.70 : R * 0.78;
+    gctx.beginPath();
+    gctx.moveTo(cx + inner * Math.cos(a), cy + inner * Math.sin(a));
+    gctx.lineTo(cx + R * 0.93 * Math.cos(a), cy + R * 0.93 * Math.sin(a));
+    gctx.strokeStyle = v === 0 ? 'rgba(200,184,154,0.6)' : 'rgba(255,255,255,0.15)';
+    gctx.lineWidth = (v === 0 ? 2 : 1) * devicePixelRatio;
+    gctx.stroke();
+    if ([-40, 0, 40].includes(v)) {
+      const labelR = inner - 14 * devicePixelRatio;
+      gctx.fillStyle = 'rgba(240,237,232,0.3)';
+      gctx.font = `${10 * devicePixelRatio}px 'DM Mono', monospace`;
+      gctx.textAlign = 'center';
+      gctx.textBaseline = 'middle';
+      gctx.fillText((v > 0 ? '+' : '') + v,
+        cx + labelR * Math.cos(a),
+        cy + labelR * Math.sin(a));
+    }
+  });
+
+  if (!active) { drawCenter(cx, cy, 5 * devicePixelRatio, 'rgba(255,255,255,0.12)'); return; }
+
+  // Couleur de l'aiguille selon l'écart
+  let needleColor = '#7ecb8f';
+  if (Math.abs(clamp) > 20) needleColor = '#e07070';
+  else if (Math.abs(clamp) > 6) needleColor = '#e8b86d';
+
+  const na = centsToAngle(clamp);
+  gctx.save();
+  gctx.shadowColor = needleColor;
+  gctx.shadowBlur = 8 * devicePixelRatio;
+  gctx.beginPath();
+  gctx.moveTo(cx, cy);
+  gctx.lineTo(cx + R * 0.86 * Math.cos(na), cy + R * 0.86 * Math.sin(na));
+  gctx.strokeStyle = needleColor;
+  gctx.lineWidth = 2.5 * devicePixelRatio;
+  gctx.lineCap = 'round';
+  gctx.stroke();
+  gctx.restore();
+
+  drawCenter(cx, cy, 6 * devicePixelRatio, needleColor);
+}
+
+function drawCenter(cx, cy, r, color) {
+  gctx.beginPath();
+  gctx.arc(cx, cy, r, 0, Math.PI*2);
+  gctx.fillStyle = color;
+  gctx.fill();
+}
+
+/* ─── Mic loop ────────────────────────────────────────── */
+// ─── Son de référence ────────────────────────────────────
+let refCtx = null, refOsc = null, refGain = null;
+
+function toggleRef() {
+  if (refPlaying) { stopRef(); return; }
+  startRef();
+}
+
+function startRef() {
+  // Arrêter d'abord si déjà actif
+  stopRef();
+  refCtx = new (window.AudioContext || window.webkitAudioContext)();
+  refGain = refCtx.createGain();
+  refGain.gain.setValueAtTime(0, refCtx.currentTime);
+  // Fondu d'entrée sur 80 ms pour éviter le clic
+  refGain.gain.linearRampToValueAtTime(0.25, refCtx.currentTime + 0.08);
+  refOsc = refCtx.createOscillator();
+  refOsc.type = 'sine';
+  refOsc.frequency.value = STRINGS[target].freq;
+  refOsc.connect(refGain);
+  refGain.connect(refCtx.destination);
+  refOsc.start();
+  refPlaying = true;
+  document.getElementById('ref-btn').classList.add('on');
+  document.getElementById('ref-label').textContent = STRINGS[target].fr + ' · ' + STRINGS[target].freq.toFixed(1) + ' Hz';
+}
+
+function stopRef() {
+  if (!refCtx) return;
+  // Fondu de sortie sur 80 ms pour éviter le clic
+  const t = refCtx.currentTime;
+  refGain.gain.setValueAtTime(refGain.gain.value, t);
+  refGain.gain.linearRampToValueAtTime(0, t + 0.08);
+  setTimeout(() => {
+    refOsc && refOsc.stop();
+    refCtx && refCtx.close();
+    refOsc = null; refCtx = null; refGain = null;
+  }, 100);
+  refPlaying = false;
+  document.getElementById('ref-btn').classList.remove('on');
+  document.getElementById('ref-label').textContent = 'référence';
+}
+
+// Quand on change de corde, mettre à jour l'oscillateur si actif
+const _origSetTarget = setTarget;
+// (déjà défini plus haut, on patche via un wrapper appelé après)
+
+async function toggleMic() {
+  if (running) { stopMic(); return; }
+  const btn = document.getElementById('mic-btn');
+  document.getElementById('mic-status').textContent = 'connexion...';
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 44100 });
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 4096;
+    audioCtx.createMediaStreamSource(stream).connect(analyser);
+    running = true;
+    btn.classList.add('on');
+    document.getElementById('mic-status').textContent = 'écoute en cours';
+    loop();
+  } catch(e) {
+    document.getElementById('mic-status').textContent = 'accès refusé';
+    console.error(e);
+  }
+}
+
+function stopMic() {
+  running = false;
+  cancelAnimationFrame(rafId);
+  stream && stream.getTracks().forEach(t => t.stop());
+  audioCtx && audioCtx.close();
+  document.getElementById('mic-btn').classList.remove('on');
+  document.getElementById('mic-status').textContent = 'appuyer pour écouter';
+  document.getElementById('det-note').textContent = '—';
+  document.getElementById('det-freq').textContent = '';
+  document.getElementById('cents-disp').textContent = '';
+  smoothCents = 0;
+  drawGauge(0, false);
+}
+
+function loop() {
+  if (!running) return;
+  rafId = requestAnimationFrame(loop);
+
+  const buf = new Float32Array(analyser.fftSize);
+  analyser.getFloatTimeDomainData(buf);
+  const rms = Math.sqrt(buf.reduce((s,v)=>s+v*v,0)/buf.length);
+  lastVolume = lastVolume * 0.85 + rms * 0.15;
+
+  if (lastVolume < 0.008) {
+    document.getElementById('det-note').textContent = '—';
+    document.getElementById('det-freq').textContent = 'cible : ' + STRINGS[target].fr + ' · ' + STRINGS[target].freq.toFixed(2) + ' Hz';
+    document.getElementById('cents-disp').textContent = '';
+    document.getElementById('det-note').style.color = 'var(--muted)';
+    drawGauge(smoothCents, false);
+    return;
+  }
+
+  const freq = yinPitch(buf, audioCtx.sampleRate);
+  const freqMin = parseFloat(document.getElementById('app').dataset.freqMin || 80);
+  const freqMax = parseFloat(document.getElementById('app').dataset.freqMax || 900);
+  if (freq < freqMin || freq > freqMax) return;
+
+  autoSelectString(freq);
+
+  const { name } = freqToNote(freq);
+  const c = centsFromTarget(freq);
+
+  // Lissage en virgule flottante — pas de Math.round ici
+  smoothCents = smoothCents * 0.80 + c * 0.20;
+
+  // Affichage fréquence : 1 décimale Hz, écart en dixièmes de cent
+  document.getElementById('det-note').textContent = name;
+  document.getElementById('det-freq').textContent =
+    freq.toFixed(1) + ' Hz · cible ' + STRINGS[target].freq.toFixed(2) + ' Hz';
+
+  const scDisp = smoothCents.toFixed(1);  // 1 décimale, ex : -3.4 cents
+  let color, label;
+  if (Math.abs(smoothCents) <= 5) {
+    color = 'var(--green)'; label = '✓ accordé';
+  } else if (smoothCents < 0) {
+    color = 'var(--red)'; label = scDisp + ' cents — trop bas';
+  } else {
+    color = 'var(--amber)'; label = '+' + scDisp + ' cents — trop haut';
+  }
+  document.getElementById('det-note').style.color = color;
+  document.getElementById('cents-disp').style.color = color;
+  document.getElementById('cents-disp').textContent = label;
+
+  drawGauge(smoothCents, true);
+}
+
+// Init : charger les préférences sauvegardées
+const savedInstrument = loadPrefs();
+document.getElementById('inst-select').value = savedInstrument;
+changeInstrument(savedInstrument);
+drawGauge(0, false);
+
+// Service worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+</script>
+</body>
+</html>
