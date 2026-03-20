@@ -35,5 +35,20 @@
       "purpose": "maskable"
     }
   ],
-  "id": "/u-tuner/index.html"
+  "id": "/u-tuner/index.html",
+  "screenshots": [
+    {
+      "src": "screenshot-mobile.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "label": "U-Tuner — accordeur chromatique"
+    },
+    {
+      "src": "screenshot-desktop.png",
+      "sizes": "1280x800",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "U-Tuner — vue desktop"
+    }
+  ]
 }
