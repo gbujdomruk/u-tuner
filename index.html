@@ -286,9 +286,9 @@ function rebuildStrings() {
   document.getElementById('a4-val').textContent = a4 + ' Hz';
   // Mettre à jour les boutons de cordes
   renderStringButtons();
-  // Mettre à jour l'oscillateur si actif
-  if (refPlaying && refOsc && STRINGS[target]) {
-    refOsc.frequency.setTargetAtTime(STRINGS[target].freq, refCtx.currentTime, 0.05);
+  // Mettre à jour la fréquence si le son de référence est actif
+  if (refPlaying && refOsc && refCtx && STRINGS[target]) {
+    refOsc.frequency.setTargetAtTime(STRINGS[target].freq, refCtx.currentTime, 0.02);
     document.getElementById('ref-label').textContent = STRINGS[target].fr + ' · ' + STRINGS[target].freq.toFixed(1) + ' Hz';
   }
 }
@@ -412,9 +412,9 @@ function setTarget(note, auto) {
   smoothCents = 0;
   document.querySelectorAll('.str-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('btn-' + note).classList.add('active');
-  // Mettre à jour l'oscillateur de référence si actif
-  if (refPlaying && refOsc) {
-    refOsc.frequency.setTargetAtTime(STRINGS[target].freq, refCtx.currentTime, 0.05);
+  // Mettre à jour la fréquence de référence si le son est actif
+  if (refPlaying && refOsc && refCtx) {
+    refOsc.frequency.setTargetAtTime(STRINGS[target].freq, refCtx.currentTime, 0.02);
     document.getElementById('ref-label').textContent = STRINGS[target].fr + ' · ' + STRINGS[target].freq.toFixed(1) + ' Hz';
   }
 }
@@ -575,7 +575,22 @@ function drawCenter(cx, cy, r, color) {
 
 /* ─── Mic loop ────────────────────────────────────────── */
 // ─── Son de référence ────────────────────────────────────
+// Un seul AudioContext créé une fois et gardé en vie.
+// On ne recrée jamais l'oscillateur — on change juste sa fréquence.
 let refCtx = null, refOsc = null, refGain = null;
+
+function ensureRefCtx() {
+  if (refCtx) return;
+  refCtx = new (window.AudioContext || window.webkitAudioContext)();
+  refGain = refCtx.createGain();
+  refGain.gain.setValueAtTime(0, refCtx.currentTime);
+  refGain.connect(refCtx.destination);
+  refOsc = refCtx.createOscillator();
+  refOsc.type = 'sine';
+  refOsc.frequency.value = STRINGS[target].freq;
+  refOsc.connect(refGain);
+  refOsc.start();
+}
 
 function toggleRef() {
   if (refPlaying) { stopRef(); return; }
@@ -583,35 +598,25 @@ function toggleRef() {
 }
 
 function startRef() {
-  // Arrêter d'abord si déjà actif
-  stopRef();
-  refCtx = new (window.AudioContext || window.webkitAudioContext)();
-  refGain = refCtx.createGain();
-  refGain.gain.setValueAtTime(0, refCtx.currentTime);
-  // Fondu d'entrée sur 80 ms pour éviter le clic
+  ensureRefCtx();
+  if (refCtx.state === 'suspended') refCtx.resume();
+  // Mettre à jour la fréquence au cas où elle aurait changé
+  refOsc.frequency.setTargetAtTime(STRINGS[target].freq, refCtx.currentTime, 0.02);
+  // Fondu d'entrée
+  refGain.gain.cancelScheduledValues(refCtx.currentTime);
+  refGain.gain.setValueAtTime(refGain.gain.value, refCtx.currentTime);
   refGain.gain.linearRampToValueAtTime(0.25, refCtx.currentTime + 0.08);
-  refOsc = refCtx.createOscillator();
-  refOsc.type = 'sine';
-  refOsc.frequency.value = STRINGS[target].freq;
-  refOsc.connect(refGain);
-  refGain.connect(refCtx.destination);
-  refOsc.start();
   refPlaying = true;
   document.getElementById('ref-btn').classList.add('on');
   document.getElementById('ref-label').textContent = STRINGS[target].fr + ' · ' + STRINGS[target].freq.toFixed(1) + ' Hz';
 }
 
 function stopRef() {
-  if (!refCtx) return;
-  // Fondu de sortie sur 80 ms pour éviter le clic
-  const t = refCtx.currentTime;
-  refGain.gain.setValueAtTime(refGain.gain.value, t);
-  refGain.gain.linearRampToValueAtTime(0, t + 0.08);
-  setTimeout(() => {
-    refOsc && refOsc.stop();
-    refCtx && refCtx.close();
-    refOsc = null; refCtx = null; refGain = null;
-  }, 100);
+  if (!refCtx || !refGain) return;
+  // Fondu de sortie propre — on garde l'oscillateur en vie (gain = 0)
+  refGain.gain.cancelScheduledValues(refCtx.currentTime);
+  refGain.gain.setValueAtTime(refGain.gain.value, refCtx.currentTime);
+  refGain.gain.linearRampToValueAtTime(0, refCtx.currentTime + 0.08);
   refPlaying = false;
   document.getElementById('ref-btn').classList.remove('on');
   document.getElementById('ref-label').textContent = 'référence';
