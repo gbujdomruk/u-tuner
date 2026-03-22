@@ -405,9 +405,12 @@ let audioCtx, analyser, stream, rafId;
 let smoothCents = 0;
 let lastVolume = 0;
 let refPlaying = false;  // déclaré ici pour être accessible dans setTarget
+let manualLockUntil = 0;  // timestamp jusqu'auquel l'auto-sélection est désactivée
 
 function setTarget(note, auto) {
   if (auto && target === note) return;
+  // Si sélection manuelle : verrouiller l'auto-sélection pendant 1.5 s
+  if (!auto) manualLockUntil = Date.now() + 1500;
   target = note;
   smoothCents = 0;
   document.querySelectorAll('.str-btn').forEach(b => b.classList.remove('active'));
@@ -420,11 +423,10 @@ function setTarget(note, auto) {
 }
 
 /* Sélectionne automatiquement la corde la plus proche.
-   Seuil de 40 cents : à mi-chemin entre deux cordes adjacentes
-   (intervalle de quinte = 700 cents, donc 350 cents de demi-chemin,
-   mais on veut basculer tôt → 40 cents suffit pour éviter les
-   faux positifs sur les harmoniques). */
+   Ignoré pendant 1.5 s après un choix manuel pour éviter que
+   le son de la note précédente écrase le choix de l'utilisateur. */
 function autoSelectString(freq) {
+  if (Date.now() < manualLockUntil) return;
   let bestNote = null, bestDist = Infinity;
   for (const [note, data] of Object.entries(STRINGS)) {
     const dist = Math.abs(1200 * Math.log2(freq / data.freq));
